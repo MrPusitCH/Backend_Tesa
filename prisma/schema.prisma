@@ -10,18 +10,18 @@ datasource db {
 model RawMessage {
   id         BigInt   @id @default(autoincrement())
   topic      String
-  payload    String   // เก็บ JSON ดิบ (string)
+  payload    String
   receivedAt DateTime @default(now())
-  // สำหรับ reprocess/debug
   parseOk    Boolean  @default(false)
   error      String?
+
   @@index([receivedAt])
 }
 
 model DroneDetection {
   id         BigInt   @id @default(autoincrement())
-  receivedAt DateTime @default(now())      // เวลาที่เซิร์ฟเวอร์รับ
-  deviceTs   DateTime                      // เวลาจาก payload.timestamp
+  receivedAt DateTime @default(now())
+  deviceTs   DateTime
   droneId    String
   latDeg     Float
   lonDeg     Float
@@ -29,51 +29,55 @@ model DroneDetection {
   speedMps   Float
   radiusM    Float?
   angleDeg   Float?
-  // NEW: extra fields for frame format
-  sourceId   String?
-  type       String?
-  confidence Float?
+  rawId      BigInt?
+  bboxH      Int?
+  bboxW      Int?
   bboxX      Int?
   bboxY      Int?
-  bboxW      Int?
-  bboxH      Int?
-
-  // link to Frame (optional for legacy)
+  confidence Float?
   frameId    BigInt?
+  sourceId   String?
+  type       String?
   frame      Frame?   @relation(fields: [frameId], references: [id])
 
-  rawId      BigInt?                       // อ้างอิง RawMessage เพื่อ trace
   @@index([deviceTs])
   @@index([droneId, deviceTs(sort: Desc)])
   @@index([frameId])
 }
 
 model Frame {
-  id           BigInt   @id @default(autoincrement())
-  receivedAt   DateTime @default(now())
+  id           BigInt           @id @default(autoincrement())
+  receivedAt   DateTime         @default(now())
   frameNo      Int
   deviceTs     DateTime
   sourceId     String
   imageBase64  String?
   objectsCount Int
-
-  // relation to detections in this frame
   detections   DroneDetection[]
-  
+
   @@index([deviceTs])
   @@index([sourceId, deviceTs])
 }
 
 model Mark {
-  id        String   @id // Custom format: MARK-${timestamp}-${random}
+  id        String   @id
   name      String
-  color     String   // Hex color code (e.g., "#FF5733")
-  latDeg    Float    // Latitude in degrees
-  lonDeg    Float    // Longitude in degrees
-  radiusM   Float    // Radius in meters
+  color     String
+  latDeg    Float
+  lonDeg    Float
+  radiusM   Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([createdAt])
   @@index([latDeg, lonDeg])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
 }

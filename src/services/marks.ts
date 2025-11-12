@@ -27,13 +27,13 @@ export async function createMark(input: CreateMarkInput) {
 }
 
 export async function getMarkById(id: string) {
-  return prisma.mark.findUnique({
+  return (prisma as any).mark.findUnique({
     where: { id },
   });
 }
 
 export async function getAllMarks() {
-  return prisma.mark.findMany({
+  return (prisma as any).mark.findMany({
     orderBy: { createdAt: "desc" },
   });
 }
@@ -57,12 +57,12 @@ export async function updateMark(id: string, input: UpdateMarkInput) {
 }
 
 export async function deleteMark(id: string) {
-  return prisma.mark.delete({
+  return (prisma as any).mark.delete({
     where: { id },
   });
 }
 
 export async function clearAllMarks() {
-  return prisma.mark.deleteMany({});
+  return (prisma as any).mark.deleteMany({});
 }
 
