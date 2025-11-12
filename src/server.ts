@@ -50,138 +50,48 @@ async function start() {
       ],
       components: {
         schemas: {
-          DronePoint: {
+          Frame: {
             type: "object",
             properties: {
-              id: {
-                type: "string",
-                description: "Unique detection identifier"
+              fram_id: { type: "string" },
+              cam_id: { type: "string" },
+              token_id: {
+                type: "object",
+                properties: {
+                  camera_info: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      sort: { type: "string" },
+                      location: { type: "string" },
+                      institute: { type: "string" },
+                    },
+                  },
+                },
               },
-              ts: {
-                type: "string",
-                format: "date-time",
-                description: "Timestamp from device (ISO 8601)"
+              timestamp: { type: "string", format: "date-time" },
+              image_info: {
+                type: "object",
+                properties: {
+                  width: { type: "number" },
+                  height: { type: "number" },
+                },
               },
-              lat: {
-                type: "number",
-                description: "Latitude in degrees"
-              },
-              lon: {
-                type: "number",
-                description: "Longitude in degrees"
-              },
-              alt_m: {
-                type: "number",
-                nullable: true,
-                description: "Altitude in meters"
-              },
-              speed_mps: {
-                type: "number",
-                nullable: true,
-                description: "Speed in meters per second"
-              },
-              radius_m: {
-                type: "number",
-                nullable: true,
-                description: "Detection radius in meters"
-              },
-              angle_deg: {
-                type: "number",
-                nullable: true,
-                description: "Angle in degrees"
-              },
-              source_id: {
-                type: "string",
-                nullable: true,
-                description: "Source camera/device identifier"
-              },
-              confidence: {
-                type: "number",
-                nullable: true,
-                description: "Detection confidence score"
-              },
-              bbox: {
+              objects: {
                 type: "array",
-                items: { type: "number", nullable: true },
-                nullable: true,
-                description: "Bounding box [x, y, width, height]"
+                items: {
+                  type: "object",
+                  properties: {
+                    obj_id: { type: "string" },
+                    type: { type: "string", nullable: true },
+                    lat: { type: "number" },
+                    lng: { type: "number" },
+                    alt: { type: "number" },
+                    speed_kt: { type: "number" },
+                  },
+                },
               },
-              type: {
-                type: "string",
-                nullable: true,
-                description: "Drone type classification"
-              }
-            }
-          },
-          DronePointDetailed: {
-            type: "object",
-            properties: {
-              id: {
-                type: "string",
-                description: "Unique detection identifier"
-              },
-              receivedAt: {
-                type: "string",
-                format: "date-time",
-                description: "Server receive timestamp (ISO 8601)"
-              },
-              deviceTs: {
-                type: "string",
-                format: "date-time",
-                description: "Device timestamp (ISO 8601)"
-              },
-              drone_id: {
-                type: "string",
-                description: "Drone identifier"
-              },
-              latitude: {
-                type: "number",
-                description: "Latitude in degrees"
-              },
-              longitude: {
-                type: "number",
-                description: "Longitude in degrees"
-              },
-              altitude_m: {
-                type: "number",
-                description: "Altitude in meters"
-              },
-              speed_mps: {
-                type: "number",
-                description: "Speed in meters per second"
-              },
-              radius_m: {
-                type: "number",
-                nullable: true,
-                description: "Detection radius in meters"
-              },
-              angle_deg: {
-                type: "number",
-                nullable: true,
-                description: "Angle in degrees"
-              },
-              source_id: {
-                type: "string",
-                nullable: true,
-                description: "Source camera/device identifier"
-              },
-              confidence: {
-                type: "number",
-                nullable: true,
-                description: "Detection confidence score"
-              },
-              bbox: {
-                type: "array",
-                items: { type: "number", nullable: true },
-                nullable: true,
-                description: "Bounding box [x, y, width, height]"
-              },
-              type: {
-                type: "string",
-                nullable: true,
-                description: "Drone type classification"
-              }
-            }
+            },
           },
           HealthResponse: {
             type: "object",
