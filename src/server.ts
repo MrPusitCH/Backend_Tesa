@@ -6,24 +6,22 @@ import "./mqtt/ingest.js";          // start ingest
 import healthRoutes from "./routes/health.js";
 import droneRoutes from "./routes/drone.js";
 import adminRoutes from "./routes/admin.js";
+import markRoutes from "./routes/mark.js";
 import { registerClient } from "./ws/hub.js";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
-// Optional: Install @fastify/cors if /docs and API are served from different origins
-// npm install @fastify/cors
-// import fastifyCors from "@fastify/cors";
+import fastifyCors from "@fastify/cors";
 
 const server = Fastify();
 
 async function start() {
   await server.register(websocket);
   
-  // Optional: Register CORS if /docs and API are served from different origins
-  // Uncomment if you need CORS support
-  // await server.register(fastifyCors, {
-  //   origin: true, // Allow all origins, or specify: ["https://yourdomain.com"]
-  //   credentials: true
-  // });
+  // Enable CORS for frontend requests (Next.js can make direct requests if needed)
+  await server.register(fastifyCors, {
+    origin: true, // Allow all origins in development, specify in production
+    credentials: true
+  });
 
   await server.register(fastifySwagger, {
     openapi: {
@@ -44,6 +42,10 @@ async function start() {
         {
           name: "Admin",
           description: "Administrative endpoints for reprocessing and managing drone data"
+        },
+        {
+          name: "Mark",
+          description: "Endpoints for managing map marks (zones, points of interest)"
         }
       ],
       components: {
@@ -308,6 +310,7 @@ async function start() {
   server.register(healthRoutes);
   server.register(droneRoutes);
   server.register(adminRoutes);
+  server.register(markRoutes);
 
   const port = Number(process.env.PORT) || 3000;
   server.listen({ port, host: "0.0.0.0" }, (err, address) =>  {

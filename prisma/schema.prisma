@@ -63,3 +63,17 @@ model Frame {
   @@index([deviceTs])
   @@index([sourceId, deviceTs])
 }
+
+model Mark {
+  id        String   @id // Custom format: MARK-${timestamp}-${random}
+  name      String
+  color     String   // Hex color code (e.g., "#FF5733")
+  latDeg    Float    // Latitude in degrees
+  lonDeg    Float    // Longitude in degrees
+  radiusM   Float    // Radius in meters
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([latDeg, lonDeg])
+}
