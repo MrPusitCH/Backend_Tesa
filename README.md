@@ -152,4 +152,4 @@ python3 drone_mqtt_simulator.py --mode detections --drone-id "test-drone" --spee
 - Default sends every 1 second
 - Drones fly in circles or straight lines
 - Fake drones (`fp-xxxxxx`) have lower confidence
-- Real drones (`sim-1`, `sim-2`, etc.) have higher confidence
+- Real drones (`sim-1`, `sim-2`, etc.) have higher confidence# SimulationData_Tesa
