@@ -18,45 +18,37 @@ model RawMessage {
   @@index([receivedAt])
 }
 
-model DroneDetection {
-  id         BigInt   @id @default(autoincrement())
-  receivedAt DateTime @default(now())
-  deviceTs   DateTime
-  droneId    String
-  latDeg     Float
-  lonDeg     Float
-  altM       Float
-  speedMps   Float
-  radiusM    Float?
-  angleDeg   Float?
-  rawId      BigInt?
-  bboxH      Int?
-  bboxW      Int?
-  bboxX      Int?
-  bboxY      Int?
-  confidence Float?
-  frameId    BigInt?
-  sourceId   String?
-  type       String?
-  frame      Frame?   @relation(fields: [frameId], references: [id])
+model Frame {
+  id              BigInt   @id @default(autoincrement())
+  framId          String   // frame id
+  camId           String   // camera id
+  cameraName      String   // from token_id.camera_info.name
+  cameraSort      String   // from token_id.camera_info.sort
+  cameraLocation  String   // from token_id.camera_info.location
+  cameraInstitute String   // from token_id.camera_info.institute
+  timestamp       DateTime // timestamp from frame
+  imageWidth      Int      // from image_info.width
+  imageHeight     Int      // from image_info.height
+  receivedAt      DateTime @default(now())
+  objects         FrameObject[]
 
-  @@index([deviceTs])
-  @@index([droneId, deviceTs(sort: Desc)])
-  @@index([frameId])
+  @@index([timestamp])
+  @@index([camId, timestamp])
 }
 
-model Frame {
-  id           BigInt           @id @default(autoincrement())
-  receivedAt   DateTime         @default(now())
-  frameNo      Int
-  deviceTs     DateTime
-  sourceId     String
-  imageBase64  String?
-  objectsCount Int
-  detections   DroneDetection[]
+model FrameObject {
+  id        BigInt   @id @default(autoincrement())
+  objId     String   // object id
+  type      String?  // object type (optional)
+  lat       Float    // latitude
+  lng       Float    // longitude
+  alt       Float    // altitude
+  speedKt   Float    // speed in knots
+  frameId   BigInt
+  frame     Frame    @relation(fields: [frameId], references: [id], onDelete: Cascade)
 
-  @@index([deviceTs])
-  @@index([sourceId, deviceTs])
+  @@index([objId])
+  @@index([frameId])
 }
 
 model Mark {

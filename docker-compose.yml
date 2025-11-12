@@ -1,19 +1,17 @@
-version: "3.9"
-
 services:
   db:
     image: postgis/postgis:16-3.4   # Postgres + PostGIS (พร้อมขยายงานแผนที่)
     container_name: drone_db
     environment:
       POSTGRES_PASSWORD: pt123456789
-      POSTGRES_USER: tesaserver
+      POSTGRES_USER: tesaserver_new
       POSTGRES_DB: drones
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d drones"]
+      test: ["CMD-SHELL", "pg_isready -U tesaserver_new -d drones"]
       interval: 5s
       timeout: 5s
       retries: 10

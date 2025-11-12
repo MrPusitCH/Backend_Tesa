@@ -1,28 +1,21 @@
 // src/mqtt/ingest.ts
 import { mqttClient } from "./client.js";
-import { droneDetectionSchema } from "../schemas/drone-detection.js";
 import { frameSchema } from "../schemas/frame.js";
 import { saveRaw } from "../services/raw.js";
-import { saveDroneDetection, saveDroneDetectionFromFrame } from "../services/drone-detections.js";
 import { saveFrame } from "../services/frames.js";
 import { broadcast } from "../ws/hub.js";
+import { mapCameraInfo } from "../services/camera-info.js";
 
-const TOPIC_DRONE = process.env.MQTT_TOPIC_DRONE || "drones/detections";
 const TOPIC_FRAME = process.env.MQTT_TOPIC_FRAME || "drones/frames";
-
-const CONFIDENT_PASS_WS = (()=> {
-  const confident = Number(process.env.CONFIDENT_PASS_WS);
-  return Number.isFinite(confident) ? confident : undefined;
-})();
+const CAMERA_TOKEN = process.env.CAMERA_TOKEN || "";
 
 // subscribe when app starts
-// A2 note: listen both topics
-mqttClient.subscribe([TOPIC_DRONE, TOPIC_FRAME], (err) => {
+mqttClient.subscribe([TOPIC_FRAME], (err: Error | null) => {
   if (err) console.error("❌ MQTT subscribe error", err);
-  else console.log(`✅ MQTT subscribed to ${TOPIC_DRONE} and ${TOPIC_FRAME}`);
+  else console.log(`✅ MQTT subscribed to ${TOPIC_FRAME}`);
 });
 
-mqttClient.on("message", async (topic, message) => {
+mqttClient.on("message", async (topic: string, message: Buffer) => {
   const text = message.toString("utf8");
   let rawId: bigint | undefined;
 
@@ -30,107 +23,89 @@ mqttClient.on("message", async (topic, message) => {
     // 1) save raw first
     rawId = await saveRaw(topic, text);
 
-    if (topic === TOPIC_DRONE) {
-      // legacy single-drone message
-      const json = JSON.parse(text);
-      const d = droneDetectionSchema.parse(json);
-
-      // save to DB
-      const id = await saveDroneDetection(d, rawId);
-
-      // send to WS
-      broadcast({
-        type: "drone",
-        drone_id: d.drone_id,
-        timestamp : d.timestamp,
-        latitude: d.latitude,
-        longitude: d.longitude,
-        altitude_m: d.altitude_m,
-        speed_mps: d.speed_mps,
-      });
-
-      await saveRaw(topic, text, { parseOk: true });
-      console.log("🛰️ Saved legacy detection", { id: id.toString(), drone_id: d.drone_id });
-      return;
-    }
-
     if (topic === TOPIC_FRAME) {
-      // new frame message (many objects)
+      // Parse incoming frame message
       const json = JSON.parse(text);
-      const frame = frameSchema.parse(json);
+      
+      // Extract fram_id and cam_id for API call
+      const { fram_id, cam_id, token_id } = json;
+      if (!fram_id || !cam_id) {
+        throw new Error("fram_id and cam_id are required in frame message");
+      }
 
-      // save frame row
-      // build params, add image only if exists
-      const frameParams: {
-        frameNo: number;
-        deviceTs: Date;
-        sourceId: string;
-        objectsCount: number;
-        imageBase64?: string;
-      } = {
-        frameNo: frame.frame_id,
-        deviceTs: frame.timestamp,
-        sourceId: frame.source_id,
-        objectsCount: frame.objects.length,
-      };
-      if (frame.image_base64) frameParams.imageBase64 = frame.image_base64;
-      const frameId = await saveFrame(frameParams);
+      // Determine which token to use: from payload (if string) or from environment
+      const token = typeof token_id === "string" ? token_id : CAMERA_TOKEN;
+      
+      console.log(`🔑 Using token: ${token ? token.substring(0, 8) + '...' : 'NONE'}`);
+      console.log(`📦 Incoming payload cam_id: ${cam_id}, fram_id: ${fram_id}`);
 
-      // save each object as detection
-      for (const obj of frame.objects) {
-        // build detection params without undefined fields
-        const detParams: {
-          droneId: string;
-          deviceTs: Date;
-          lat: number;
-          lon: number;
-          altM: number;
-          speedMps: number;
-          sourceId: string;
-          type?: string;
-          confidence?: number;
-          bbox?: [number, number, number, number];
-          frameId?: bigint;
-          rawId?: bigint;
-        } = {
-          droneId: obj.drone_id,
-          deviceTs: (obj.timestamp as Date | undefined) ?? frame.timestamp,
-          lat: obj.lat,
-          lon: obj.lon,
-          altM: obj.alt_m,
-          speedMps: obj.speed_mps,
-          sourceId: frame.source_id,
-          bbox: obj.bbox,
-          frameId,
-          rawId,
-        };
-        if (typeof obj.type === "string") detParams.type = obj.type;
-        if (typeof obj.confidence === "number") detParams.confidence = obj.confidence;
-        const detId = await saveDroneDetectionFromFrame(detParams);
-
-        const conf = typeof obj.confidence === "number" ? obj.confidence : undefined;
-        const passes = 
-        CONFIDENT_PASS_WS === undefined ? true : (conf !== undefined && conf >= CONFIDENT_PASS_WS);
-
-        if (passes) {          
-        // send to WS (simple per object)
-        broadcast({
-          type: "drone",
-          drone_id: obj.drone_id,
-          timestamp: obj.timestamp ?? frame.timestamp,
-          latitude: obj.lat,
-          longitude: obj.lon,
-          altitude_m: obj.alt_m,
-          speed_mps: obj.speed_mps,
-          source_id: frame.source_id,
-          confidence: obj.confidence,
-          bbox: obj.bbox,
-        });
+      // Fetch camera_info from API and enrich payload
+      let enrichedPayload;
+      if (token) {
+        try {
+          // Remove token_id from payload before enriching (it will be replaced with object structure)
+          const { token_id: _, ...payloadWithoutToken } = json;
+          console.log(`🔄 Calling mapCameraInfo for cam_id: ${cam_id}`);
+          enrichedPayload = await mapCameraInfo(payloadWithoutToken, token);
+          console.log(`✅ Successfully enriched payload with camera_info`);
+        } catch (apiError: any) {
+          console.error(`⚠️ Failed to fetch camera info for cam_id ${cam_id}:`, apiError.message);
+          console.error(`   Error details:`, apiError);
+          // If API call fails, check if camera_info is already in the payload
+          if (json.token_id?.camera_info) {
+            console.log(`   Using camera_info from payload as fallback`);
+            enrichedPayload = json;
+          } else {
+            throw new Error(`Camera info not available and API call failed: ${apiError.message}`);
+          }
+        }
+      } else {
+        console.warn(`⚠️ No token available (neither in payload nor CAMERA_TOKEN env)`);
+        // No token available, use camera_info from payload if present
+        if (json.token_id?.camera_info) {
+          console.log(`   Using camera_info from payload`);
+          enrichedPayload = json;
+        } else {
+          throw new Error("No camera token available (neither in payload nor CAMERA_TOKEN env) and camera_info not in payload");
         }
       }
 
+      // Validate enriched frame with schema
+      const frame = frameSchema.parse(enrichedPayload);
+
+      // Save frame with objects
+      await saveFrame({
+        framId: frame.fram_id,
+        camId: frame.cam_id,
+        cameraName: frame.token_id.camera_info.name,
+        cameraSort: frame.token_id.camera_info.sort,
+        cameraLocation: frame.token_id.camera_info.location,
+        cameraInstitute: frame.token_id.camera_info.institute,
+        timestamp: frame.timestamp,
+        imageWidth: frame.image_info.width,
+        imageHeight: frame.image_info.height,
+        objects: frame.objects.map((obj: any) => ({
+          objId: obj.obj_id,
+          type: obj.type,
+          lat: obj.lat,
+          lng: obj.lng,
+          alt: obj.alt,
+          speedKt: obj.speed_kt,
+        })),
+      });
+
+      // Broadcast to WebSocket clients
+      broadcast({
+        fram_id: frame.fram_id,
+        cam_id: frame.cam_id,
+        token_id: frame.token_id,
+        timestamp: frame.timestamp.toISOString(),
+        image_info: frame.image_info,
+        objects: frame.objects,
+      });
+
       await saveRaw(topic, text, { parseOk: true });
-      console.log("🖼️ Saved frame & detections", { frameId: frameId.toString(), count: frame.objects.length });
+      console.log("🖼️ Saved frame", { fram_id: frame.fram_id, objects_count: frame.objects.length });
       return;
     }
   } catch (e: any) {
