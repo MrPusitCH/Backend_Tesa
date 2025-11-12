@@ -60,20 +60,17 @@ mqttClient.on("message", async (topic, message) => {
       const frame = frameSchema.parse(json);
 
       // save frame row
-      // build params, add image only if exists
       const frameParams: {
         frameNo: number;
         deviceTs: Date;
         sourceId: string;
         objectsCount: number;
-        imageBase64?: string;
       } = {
-        frameNo: frame.frame_id,
+        frameNo: parseInt(frame.fram_id),
         deviceTs: frame.timestamp,
-        sourceId: frame.source_id,
+        sourceId: frame.cam_id,
         objectsCount: frame.objects.length,
       };
-      if (frame.image_base64) frameParams.imageBase64 = frame.image_base64;
       const frameId = await saveFrame(frameParams);
 
       // save each object as detection
@@ -88,45 +85,33 @@ mqttClient.on("message", async (topic, message) => {
           speedMps: number;
           sourceId: string;
           type?: string;
-          confidence?: number;
-          bbox?: [number, number, number, number];
           frameId?: bigint;
           rawId?: bigint;
         } = {
-          droneId: obj.drone_id,
-          deviceTs: (obj.timestamp as Date | undefined) ?? frame.timestamp,
+          droneId: obj.obj_id,
+          deviceTs: frame.timestamp,
           lat: obj.lat,
-          lon: obj.lon,
-          altM: obj.alt_m,
-          speedMps: obj.speed_mps,
-          sourceId: frame.source_id,
-          bbox: obj.bbox,
+          lon: obj.lng,
+          altM: obj.alt,
+          speedMps: obj.speed_kt,
+          sourceId: frame.cam_id,
           frameId,
-          rawId,
         };
+        if (rawId !== undefined) detParams.rawId = rawId;
         if (typeof obj.type === "string") detParams.type = obj.type;
-        if (typeof obj.confidence === "number") detParams.confidence = obj.confidence;
-        const detId = await saveDroneDetectionFromFrame(detParams);
+        await saveDroneDetectionFromFrame(detParams);
 
-        const conf = typeof obj.confidence === "number" ? obj.confidence : undefined;
-        const passes = 
-        CONFIDENT_PASS_WS === undefined ? true : (conf !== undefined && conf >= CONFIDENT_PASS_WS);
-
-        if (passes) {          
         // send to WS (simple per object)
         broadcast({
           type: "drone",
-          drone_id: obj.drone_id,
-          timestamp: obj.timestamp ?? frame.timestamp,
+          drone_id: obj.obj_id,
+          timestamp: frame.timestamp,
           latitude: obj.lat,
-          longitude: obj.lon,
-          altitude_m: obj.alt_m,
-          speed_mps: obj.speed_mps,
-          source_id: frame.source_id,
-          confidence: obj.confidence,
-          bbox: obj.bbox,
+          longitude: obj.lng,
+          altitude_m: obj.alt,
+          speed_mps: obj.speed_kt,
+          source_id: frame.cam_id,
         });
-        }
       }
 
       await saveRaw(topic, text, { parseOk: true });

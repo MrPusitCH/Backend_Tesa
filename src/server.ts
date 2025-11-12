@@ -301,10 +301,100 @@ async function start() {
     }
   });
 
-  server.get("/ws", { websocket: true }, (conn, _req: FastifyRequest) => {
-    console.log("🔌 New WebSocket connection");
-    registerClient(conn);
-    conn.send(JSON.stringify({ type: "hello", ok: true }));
+  server.get("/ws", { websocket: true }, async (conn, req: FastifyRequest) => {
+    const query = req.query as any;
+    const role = query.role as "pi" | "viewer" | undefined;
+    
+    console.log(`🔌 New WebSocket connection: role=${role || "legacy"}`);
+    
+    // Legacy MQTT viewer or new viewer
+    if (!role || role === "viewer") {
+      registerClient(conn);
+      conn.send(JSON.stringify({ type: "hello", ok: true }));
+      return;
+    }
+    
+    // Pi camera connection
+    if (role === "pi") {
+      const sourceId = query.source_id;
+      const camId = query.cam_id;
+      const token = query.token;
+      
+      console.log(`📷 Pi camera connected: source_id=${sourceId}, cam_id=${camId}`);
+      
+      let pendingMetadata: any = null;
+      
+      conn.on("message", async (data: Buffer) => {
+        try {
+          // Check if JSON or binary
+          if (data[0] === 0x7b || data[0] === 0x22) {
+            // JSON metadata
+            const text = data.toString("utf8");
+            const json = JSON.parse(text);
+            const { frameSchema } = await import("./schemas/frame.js");
+            pendingMetadata = frameSchema.parse(json);
+            console.log(`📋 Received metadata for frame ${pendingMetadata.fram_id}`);
+          } else {
+            // Binary image
+            if (!pendingMetadata) {
+              console.warn("⚠️  Received image without metadata");
+              return;
+            }
+            
+            const imageBase64 = data.toString("base64");
+            
+            // Fetch camera info if available
+            let cameraInfo = null;
+            if (camId && token) {
+              try {
+                const axios = (await import("axios")).default;
+                const response = await axios.get(
+                  `https://tesa-api.crma.dev/api/object-detection/info/${camId}`,
+                  {
+                    headers: {
+                      "x-camera-token": token,
+                      "Accept": "application/json",
+                    },
+                  }
+                );
+                const apiData = response.data;
+                cameraInfo = {
+                  name: String(apiData.name || ""),
+                  sort: String(apiData.sort || ""),
+                  location: String(apiData.location || ""),
+                  institute: String(apiData.Institute || apiData.institute || ""),
+                };
+              } catch (error: any) {
+                console.error(`❌ Failed to fetch camera info: ${error.message}`);
+              }
+            }
+            
+            // Build frame payload
+            const framePayload = {
+              kind: "frame",
+              meta: {
+                ...pendingMetadata,
+                ...(cameraInfo && {
+                  token_id: {
+                    camera_info: cameraInfo,
+                  },
+                }),
+              },
+              image_jpeg_base64: imageBase64,
+            };
+            
+            // Broadcast to all viewers
+            const { broadcast } = await import("./ws/hub.js");
+            broadcast(framePayload);
+            console.log(`📤 Broadcasted frame ${pendingMetadata.fram_id}`);
+            
+            pendingMetadata = null;
+          }
+        } catch (error: any) {
+          console.error("❌ Error processing Pi message:", error.message);
+        }
+      });
+    }
   });
 
   server.register(healthRoutes);

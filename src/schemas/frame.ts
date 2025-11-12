@@ -6,20 +6,28 @@ const int = z.preprocess(v => typeof v === "string" ? parseInt(String(v), 10) : 
 
 // frame message schema (topic: drones/frames)
 export const frameSchema = z.object({
-  frame_id: int,                 // frame number
-  timestamp: z.coerce.date(),    // time of frame
-  source_id: z.string().min(1),  // camera id
-  image_base64: z.string().optional(),
+  fram_id: z.string(),
+  cam_id: z.string(),
+  token_id: z.object({
+    camera_info: z.object({
+      name: z.string(),
+      sort: z.string(),
+      location: z.string(),
+      institute: z.string(),
+    }),
+  }).optional(),
+  timestamp: z.coerce.date(),
+  image_info: z.object({
+    width: int,
+    height: int,
+  }).optional(),
   objects: z.array(z.object({
-    drone_id: z.string().min(1),
-    type: z.string().optional(),
+    obj_id: z.string(),
+    type: z.string(),
     lat: num,
-    lon: num,
-    alt_m: num,
-    speed_mps: num,
-    bbox: z.tuple([int, int, int, int]),
-    confidence: num.optional(),
-    timestamp: z.coerce.date().optional(),
+    lng: num,
+    alt: num,
+    speed_kt: num,
   })),
 });
 

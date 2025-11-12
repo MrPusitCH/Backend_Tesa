@@ -59,6 +59,48 @@ model Frame {
   @@index([sourceId, deviceTs])
 }
 
+model FrameNew {
+  framId         String              @id
+  camId          String
+  timestamp      DateTime
+  imageWidth     Int?
+  imageHeight    Int?
+  imageBytes     Bytes?
+  imageUrl       String?
+  rawMeta        String?
+  receivedAt     DateTime            @default(now())
+  cameraInfo     CameraInfoSnapshot?
+  objects        FrameObject[]
+
+  @@index([camId, timestamp])
+  @@index([timestamp])
+}
+
+model CameraInfoSnapshot {
+  id        BigInt    @id @default(autoincrement())
+  framId    String    @unique
+  name      String
+  sort      String
+  location  String
+  institute String
+  frame     FrameNew  @relation(fields: [framId], references: [framId], onDelete: Cascade)
+}
+
+model FrameObject {
+  id       BigInt   @id @default(autoincrement())
+  framId   String
+  objId    String
+  type     String
+  lat      Float
+  lng      Float
+  alt      Float
+  speedKt  Float
+  frame    FrameNew @relation(fields: [framId], references: [framId], onDelete: Cascade)
+
+  @@index([framId])
+  @@index([objId])
+}
+
 model Mark {
   id        String   @id
   name      String

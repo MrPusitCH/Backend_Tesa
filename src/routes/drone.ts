@@ -227,7 +227,7 @@ export default async function droneRoutes(app: FastifyInstance, _opts: FastifyPl
     const { drone_id, limit } = (req.query as any) ?? {};
     if (!drone_id) return reply.code(400).send({ error: "drone_id required" });
     const rows = await listDetections(drone_id, Number(limit) || 100);
-    return rows.map(r => ({
+    return rows.map((r: any) => ({
       id: r.id.toString?.() ?? r.id,
       ts: r.deviceTs,
       lat: r.latDeg, lon: r.lonDeg,
