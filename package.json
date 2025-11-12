@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "clear-db": "tsx clear-db.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,7 @@
     "@fastify/swagger-ui": "^5.2.3",
     "@fastify/websocket": "^11.2.0",
     "@prisma/client": "^6.16.2",
+    "axios": "^1.13.2",
     "fastify": "^5.6.1",
     "mqtt": "^5.14.1",
     "ws": "^8.18.3",
