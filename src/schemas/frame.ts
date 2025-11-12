@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 // simple helper: allow string numbers
-const num = z.preprocess(v => typeof v === "string" ? parseFloat(v) : v, z.number());
-const int = z.preprocess(v => typeof v === "string" ? parseInt(String(v), 10) : v, z.number().int());
+const num = z.preprocess((v: unknown) => typeof v === "string" ? parseFloat(v) : v, z.number());
+const int = z.preprocess((v: unknown) => typeof v === "string" ? parseInt(String(v), 10) : v, z.number().int());
 
 // frame message schema (topic: drones/frames)
 export const frameSchema = z.object({

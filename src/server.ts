@@ -156,7 +156,7 @@ async function start() {
   
   // Hook to dynamically set server URL based on the actual request origin
   // This ensures Swagger UI calls the correct server, even behind proxies
-  server.addHook('onSend', async (request, reply, payload) => {
+  server.addHook('onSend', async (request: FastifyRequest, reply: any, payload: any) => {
     // Only modify the OpenAPI spec JSON response
     if (reply.getHeader('content-type')?.toString().includes('application/json') && 
         typeof payload === 'string' && 
@@ -211,7 +211,7 @@ async function start() {
     }
   });
 
-  server.get("/ws", { websocket: true }, (conn, _req: FastifyRequest) => {
+  server.get("/ws", { websocket: true }, (conn: any, _req: FastifyRequest) => {
     console.log("🔌 New WebSocket connection");
     registerClient(conn);
     conn.send(JSON.stringify({ type: "hello", ok: true }));
@@ -223,7 +223,7 @@ async function start() {
   server.register(markRoutes);
 
   const port = Number(process.env.PORT) || 3000;
-  server.listen({ port, host: "0.0.0.0" }, (err, address) =>  {
+  server.listen({ port, host: "0.0.0.0" }, (err: Error | null, address: string) =>  {
     if (err) { console.error(err); process.exit(1); }
     console.log(`🚀 Server ready at ${address}`);
   });

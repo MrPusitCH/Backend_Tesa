@@ -213,9 +213,9 @@
             }
         }
 
-        // Create or update drone card in sidebar
-        function updateDroneCard(droneData) {
-            const cardId = `card-${droneData.drone_id}`;
+        // Create or update object card in sidebar (new structure)
+        function updateObjectCard(objectData) {
+            const cardId = `card-${objectData.obj_id}`;
             let card = document.getElementById(cardId);
 
             if (!card) {
@@ -224,52 +224,56 @@
                 card.id = cardId;
                 card.className = 'drone-card';
                 card.onclick = () => {
-                    // Focus map on this drone
-                    map.setView([droneData.latitude, droneData.longitude], 17);
-                    droneMarkers[droneData.drone_id].openPopup();
+                    // Focus map on this object
+                    map.setView([objectData.lat, objectData.lng], 17);
+                    droneMarkers[objectData.obj_id].openPopup();
                 };
                 document.getElementById('droneCards').appendChild(card);
             }
 
             // Update card content
-            const time = new Date(droneData.timestamp).toLocaleTimeString();
-            const confidence = droneData.confidence ? `${(droneData.confidence * 100).toFixed(0)}%` : 'N/A';
-            const source = droneData.source_id || 'Unknown';
-            const bbox = droneData.bbox ? `[${droneData.bbox[0]}, ${droneData.bbox[1]}, ${droneData.bbox[2]}×${droneData.bbox[3]}]` : 'N/A';
+            const time = new Date(objectData.timestamp).toLocaleTimeString();
+            const type = objectData.type || 'Unknown';
+            const camId = objectData.cam_id || 'Unknown';
+            const cameraName = objectData.camera_info?.name || 'N/A';
             
             card.innerHTML = `
                 <div class="drone-card-header">
                     <span class="drone-icon">✈️</span>
-                    <span>${droneData.drone_id}</span>
+                    <span>${objectData.obj_id}</span>
                 </div>
                 <div class="drone-card-data">
                     <div class="data-item">
+                        <span class="data-label">Type</span>
+                        <span class="data-value">${type}</span>
+                    </div>
+                    <div class="data-item">
                         <span class="data-label">Height</span>
-                        <span class="data-value">${droneData.altitude_m.toFixed(1)} m</span>
+                        <span class="data-value">${objectData.alt.toFixed(1)} m</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Speed</span>
-                        <span class="data-value">${droneData.speed_mps.toFixed(2)} m/s</span>
+                        <span class="data-value">${objectData.speed_kt.toFixed(2)} kt</span>
                     </div>
                     <div class="data-item">
-                        <span class="data-label">Confidence</span>
-                        <span class="data-value">${confidence}</span>
+                        <span class="data-label">Speed (m/s)</span>
+                        <span class="data-value">${objectData.speed_mps.toFixed(2)}</span>
                     </div>
                     <div class="data-item">
-                        <span class="data-label">Source</span>
-                        <span class="data-value">${source}</span>
+                        <span class="data-label">Camera ID</span>
+                        <span class="data-value">${camId}</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Location</span>
+                        <span class="data-value">${cameraName}</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Latitude</span>
-                        <span class="data-value">${droneData.latitude.toFixed(6)}</span>
+                        <span class="data-value">${objectData.lat.toFixed(6)}</span>
                     </div>
                     <div class="data-item">
                         <span class="data-label">Longitude</span>
-                        <span class="data-value">${droneData.longitude.toFixed(6)}</span>
-                    </div>
-                    <div class="data-item" style="grid-column: 1 / -1;">
-                        <span class="data-label">Bounding Box</span>
-                        <span class="data-value" style="font-size: 11px;">${bbox}</span>
+                        <span class="data-value">${objectData.lng.toFixed(6)}</span>
                     </div>
                     <div class="data-item" style="grid-column: 1 / -1;">
                         <span class="data-label">Last Update</span>
@@ -278,7 +282,7 @@
                 </div>
             `;
 
-            // Update total drones count
+            // Update total objects count
             document.getElementById('totalDrones').textContent = Object.keys(drones).length;
         }
 
@@ -317,50 +321,75 @@
             if (data.type === 'hello') {
                 console.log('Server said hello!');
             } 
-            else if (data.type === 'drone') {
-                const droneId = data.drone_id;
-
-                // Store drone data
-                drones[droneId] = data;
-
-                // Remove "no drones" message if this is the first drone
-                removeNoDataMessage();
-
-                // Update drone card in sidebar
-                updateDroneCard(data);
-
-                // Update or create drone marker on map
-                const popupContent = `
-                    <b>${data.drone_id}</b><br>
-                    Height: ${data.altitude_m.toFixed(2)}m<br>
-                    Speed: ${data.speed_mps.toFixed(2)} m/s<br>
-                    ${data.confidence ? `Confidence: ${(data.confidence * 100).toFixed(0)}%<br>` : ''}
-                    ${data.source_id ? `Source: ${data.source_id}<br>` : ''}
-                    ${data.bbox ? `Box: [${data.bbox[0]}, ${data.bbox[1]}, ${data.bbox[2]}×${data.bbox[3]}]` : ''}
-                `;
+            else if (data.fram_id && data.objects) {
+                // New frame structure with objects
+                const frame = data;
                 
-                if (droneMarkers[droneId]) {
-                    // Move existing marker
-                    droneMarkers[droneId].setLatLng([data.latitude, data.longitude]);
-                    droneMarkers[droneId].setPopupContent(popupContent);
-                } else {
-                    // Create new marker with unique color
-                    const color = getDroneColor(droneId);
-                    const icon = L.divIcon({
-                        className: 'drone-marker',
-                        html: `<div style="background: ${color}; width: 40px; height: 40px; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 15px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 24px;">✈️</div>`,
-                        iconSize: [40, 40],
-                        iconAnchor: [20, 20]
-                    });
+                // Process each object in the frame
+                frame.objects.forEach((obj) => {
+                    const objId = obj.obj_id;
                     
-                    droneMarkers[droneId] = L.marker([data.latitude, data.longitude], { icon: icon })
-                        .addTo(map)
-                        .bindPopup(popupContent);
-                }
+                    // Convert speed from knots to m/s for display (1 knot = 0.514444 m/s)
+                    const speedMps = obj.speed_kt * 0.514444;
+                    
+                    // Create object data structure for display
+                    const objectData = {
+                        obj_id: objId,
+                        type: obj.type || 'Unknown',
+                        lat: obj.lat,
+                        lng: obj.lng,
+                        alt: obj.alt,
+                        speed_kt: obj.speed_kt,
+                        speed_mps: speedMps,
+                        timestamp: frame.timestamp,
+                        cam_id: frame.cam_id,
+                        camera_info: frame.token_id?.camera_info || {},
+                    };
 
-                // Center map on first drone only
-                if (Object.keys(drones).length === 1) {
-                    map.setView([data.latitude, data.longitude], 16);
+                    // Store object data
+                    drones[objId] = objectData;
+
+                    // Remove "no drones" message if this is the first object
+                    removeNoDataMessage();
+
+                    // Update object card in sidebar
+                    updateObjectCard(objectData);
+
+                    // Update or create object marker on map
+                    const popupContent = `
+                        <b>${objId}</b><br>
+                        Type: ${obj.type || 'Unknown'}<br>
+                        Height: ${obj.alt.toFixed(2)}m<br>
+                        Speed: ${obj.speed_kt.toFixed(2)} kt (${speedMps.toFixed(2)} m/s)<br>
+                        Camera: ${frame.cam_id}<br>
+                        ${frame.token_id?.camera_info?.name ? `Location: ${frame.token_id.camera_info.name}<br>` : ''}
+                        Frame: ${frame.fram_id}
+                    `;
+                    
+                    if (droneMarkers[objId]) {
+                        // Move existing marker
+                        droneMarkers[objId].setLatLng([obj.lat, obj.lng]);
+                        droneMarkers[objId].setPopupContent(popupContent);
+                    } else {
+                        // Create new marker with unique color
+                        const color = getDroneColor(objId);
+                        const icon = L.divIcon({
+                            className: 'drone-marker',
+                            html: `<div style="background: ${color}; width: 40px; height: 40px; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 15px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; font-size: 24px;">✈️</div>`,
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        });
+                        
+                        droneMarkers[objId] = L.marker([obj.lat, obj.lng], { icon: icon })
+                            .addTo(map)
+                            .bindPopup(popupContent);
+                    }
+                });
+
+                // Center map on first object only
+                if (Object.keys(drones).length === 1 && frame.objects.length > 0) {
+                    const firstObj = frame.objects[0];
+                    map.setView([firstObj.lat, firstObj.lng], 16);
                 }
             }
         };

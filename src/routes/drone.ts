@@ -1,5 +1,5 @@
 // src/routes/drone.ts
-import type { FastifyInstance, FastifyPluginOptions } from "fastify";
+import type { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from "fastify";
 import { getLatestFrame, getFramesByCamId, getAllFrames } from "../services/frames.js";
 
 export default async function droneRoutes(app: FastifyInstance, _opts: FastifyPluginOptions) {
@@ -56,7 +56,7 @@ export default async function droneRoutes(app: FastifyInstance, _opts: FastifyPl
         },
       },
     },
-  }, async (req, reply) => {
+  }, async (req: FastifyRequest, reply: FastifyReply) => {
     const frame = await getLatestFrame();
     if (!frame) return reply.send({});
     
@@ -159,8 +159,8 @@ export default async function droneRoutes(app: FastifyInstance, _opts: FastifyPl
         },
       },
     },
-  }, async (req, reply) => {
-    const { cam_id, limit } = (req.query as any) ?? {};
+  }, async (req: FastifyRequest<{ Querystring: { cam_id?: string; limit?: number } }>, reply: FastifyReply) => {
+    const { cam_id, limit } = req.query ?? {};
     const frames = cam_id 
       ? await getFramesByCamId(cam_id, Number(limit) || 100)
       : await getAllFrames(Number(limit) || 100);

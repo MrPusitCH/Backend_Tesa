@@ -1,5 +1,5 @@
 // src/routes/admin.ts
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getRawById } from "../services/raw.js";
 import { frameSchema } from "../schemas/frame.js";
 import { saveFrame } from "../services/frames.js";
@@ -74,15 +74,15 @@ export default async function adminRoutes(app: FastifyInstance) {
         }
       }
     }
-  }, async (req, reply) => {
-    const { rawId } = req.params as { rawId: string };
+  }, async (req: FastifyRequest<{ Params: { rawId: string }; Body: { set?: any } }>, reply: FastifyReply) => {
+    const { rawId } = req.params;
     const raw = await getRawById(rawId);
     if (!raw) return reply.code(404).send({ ok: false, error: "raw not found" });
 
     let json: any;
     try { json = JSON.parse(raw.payload); } catch { return reply.code(400).send({ ok:false, error:"invalid raw json" }); }
 
-    const patch = (req.body as any)?.set ?? {};
+    const patch = req.body?.set ?? {};
     const patched = { ...json, ...patch };
     try {
       const frame = frameSchema.parse(patched);
@@ -96,7 +96,7 @@ export default async function adminRoutes(app: FastifyInstance) {
         timestamp: frame.timestamp,
         imageWidth: frame.image_info.width,
         imageHeight: frame.image_info.height,
-        objects: frame.objects.map(obj => ({
+        objects: frame.objects.map((obj: any) => ({
           objId: obj.obj_id,
           type: obj.type,
           lat: obj.lat,

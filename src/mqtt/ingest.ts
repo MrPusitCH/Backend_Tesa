@@ -8,12 +8,12 @@ import { broadcast } from "../ws/hub.js";
 const TOPIC_FRAME = process.env.MQTT_TOPIC_FRAME || "drones/frames";
 
 // subscribe when app starts
-mqttClient.subscribe([TOPIC_FRAME], (err) => {
+mqttClient.subscribe([TOPIC_FRAME], (err: Error | null) => {
   if (err) console.error("❌ MQTT subscribe error", err);
   else console.log(`✅ MQTT subscribed to ${TOPIC_FRAME}`);
 });
 
-mqttClient.on("message", async (topic, message) => {
+mqttClient.on("message", async (topic: string, message: Buffer) => {
   const text = message.toString("utf8");
   let rawId: bigint | undefined;
 
@@ -37,7 +37,7 @@ mqttClient.on("message", async (topic, message) => {
         timestamp: frame.timestamp,
         imageWidth: frame.image_info.width,
         imageHeight: frame.image_info.height,
-        objects: frame.objects.map(obj => ({
+        objects: frame.objects.map((obj: any) => ({
           objId: obj.obj_id,
           type: obj.type,
           lat: obj.lat,
